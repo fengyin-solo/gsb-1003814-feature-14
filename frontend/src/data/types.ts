@@ -17,6 +17,8 @@ export type ModuleMeta = {
   statuses: string[]
   actions: string[]
   actionTargets: Record<string, string>
+  /** 可选：动作允许的发起状态。配了才校验，例如「归档」只允许从已整理/已拼对发起。 */
+  actionSources?: Record<string, string[]>
   metrics: string[]
 }
 

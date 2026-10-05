@@ -65,8 +65,37 @@
 
     <footer class="page-foot">
       <span>共 {{ total }} 条出土遗物记录</span>
+      <span v-if="notice" class="notice-text">{{ notice }}</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
+
+    <section class="matching-panel">
+      <h3>待拼对清单（陶器整理完成，等待拼对）</h3>
+      <table v-if="pendingMatching.length" class="data-table">
+        <thead>
+          <tr>
+            <th>标本编号</th>
+            <th>出土单位</th>
+            <th>器形类别</th>
+            <th>纹饰特征</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in pendingMatching" :key="String(item.id)">
+            <td>{{ item.标本编号 ?? '—' }}</td>
+            <td>{{ item.出土单位 ?? '—' }}</td>
+            <td>{{ item.器形类别 ?? '—' }}</td>
+            <td>{{ item.纹饰特征 ?? '—' }}</td>
+            <td class="row-actions">
+              <button class="link" type="button" @click="confirmMatching(item)">登记拼对</button>
+              <RouterLink class="link" to="/pottery">前往陶器整理</RouterLink>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty-state">暂无待拼对的陶器标本，陶器整理「完成整理」后会进入此清单</p>
+    </section>
   </section>
 </template>
 
@@ -76,6 +105,7 @@ import { computed, onMounted, ref } from 'vue'
 import {
   downloadEntries,
   listEntries,
+  listPendingMatching,
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
@@ -90,7 +120,10 @@ const stats = [{"label": "遗物总数", "value": 0}, {"label": "已入库数", 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const notice = ref('')
 const filters = ref<Record<string, string>>({})
+// 待拼对清单：陶器整理模块「完成整理」后流转过来的标本
+const pendingMatching = ref<EntryRow[]>([])
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
@@ -122,6 +155,23 @@ function runAction(action: string, row: EntryRow) {
   reload()
 }
 
+/** 在待拼对清单里直接登记拼对：改的是陶器整理模块的标本状态。 */
+function confirmMatching(row: EntryRow) {
+  errorMessage.value = ''
+  notice.value = ''
+  const result = applyAction('pottery', Number(row.id), '登记拼对')
+  if (!result.ok) {
+    errorMessage.value = result.message
+    return
+  }
+  notice.value = result.message
+  reloadMatching()
+}
+
+function reloadMatching() {
+  pendingMatching.value = listPendingMatching()
+}
+
 function reload() {
   errorMessage.value = ''
   try {
@@ -133,5 +183,8 @@ function reload() {
   }
 }
 
-onMounted(reload)
+onMounted(() => {
+  reload()
+  reloadMatching()
+})
 </script>
