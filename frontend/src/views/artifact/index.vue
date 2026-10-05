@@ -63,6 +63,32 @@
       </tbody>
     </table>
 
+    <section class="matching-panel">
+      <header class="matching-head">
+        <h3>待拼对清单</h3>
+        <span class="matching-desc">陶器整理完成、等待拼对登记的陶器标本，可在此直接登记拼对。</span>
+      </header>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th v-for="column in matchingColumns" :key="column">{{ column }}</th>
+            <th>可执行动作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in pendingMatching" :key="String(item.id)">
+            <td v-for="column in matchingColumns" :key="column">{{ item[column] ?? '—' }}</td>
+            <td class="row-actions">
+              <button class="link" type="button" @click="registerMatching(item)">登记拼对</button>
+            </td>
+          </tr>
+          <tr v-if="!pendingMatching.length">
+            <td :colspan="matchingColumns.length + 1" class="empty-state">暂无待拼对的陶器标本</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条出土遗物记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -79,6 +105,7 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { listPendingMatching } from '@/api/pottery-service'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('artifact')
@@ -86,11 +113,13 @@ const columns = ["器物编号", "出土探方", "出土层位", "器物质地",
 const actions = ["完成清洗", "分配编号", "办理入库"]
 const statuses = ["已采集", "已清洗", "已编号", "已入库", "借出展示"]
 const stats = [{"label": "遗物总数", "value": 0}, {"label": "已入库数", "value": 0}, {"label": "待清洗数", "value": 0}]
+const matchingColumns = ["标本编号", "出土单位", "器形类别", "尺寸测量"]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
+const pendingMatching = ref<EntryRow[]>([])
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
@@ -122,12 +151,23 @@ function runAction(action: string, row: EntryRow) {
   reload()
 }
 
+function registerMatching(item: EntryRow) {
+  errorMessage.value = ''
+  const result = applyAction('pottery', Number(item.id), '登记拼对')
+  if (!result.ok) {
+    errorMessage.value = result.message
+    return
+  }
+  reload()
+}
+
 function reload() {
   errorMessage.value = ''
   try {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    pendingMatching.value = listPendingMatching()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '出土遗物列表读取失败'
   }
